@@ -21,6 +21,7 @@ async def run(task: str):
     async for message in query(
         prompt=task,
         options=ClaudeAgentOptions(
+            model="claude-opus-4-6",
             allowed_tools=["Read", "Bash", "Glob", "Grep", "Edit"],
             permission_mode="acceptEdits",
             system_prompt=SYSTEM_PROMPT,

@@ -378,46 +378,108 @@ if __name__ == "__main__":
 
     # Describe what you want done on the VTT project
     TASK = """
-    Read the file at:
-      C:/Users/Evanm/personal projects/VTT-All/VTT-ALL-RPG/cleanup_frontend.md
+    Implement ALL of Phase 4 of the Quest Board TTRPG platform. Read the ROADMAP at:
+      C:/Users/Evanm/personal projects/VTT-All/VTT-ALL-RPG/MD files/management agent/ROADMAP.md
 
-    That file is a frontend cleanup audit. Apply every fix listed in it:
+    Phase 4 — Platform & Social Features (all 6 items are currently unchecked):
 
-    MUST FIX — Replace Math.random() with rollDice from src/lib/dice.ts in these files:
-      - frontend/src/components/character/creation-steps/MazeRatsSpellStep.tsx (lines 13, 42)
-      - frontend/src/components/character/level-up-steps/AbilityImproveRollStep.tsx (lines 39-40)
-      - frontend/src/components/character/level-up-steps/HpGrowthStep.tsx (line 35)
-      - frontend/src/components/character/level-up-steps/HpRollOverStep.tsx (line 26)
+    1. PUBLIC CHARACTER SHEET URLs (shareable via slug)
+       - Add a `slug` column to the `characters` table (unique, URL-safe, auto-generated from name)
+       - Create migration: backend/sql/012_phase4.sql
+       - Add a public route /characters/public/:slug that renders the character sheet
+         read-only, accessible without login
+       - Update Supabase RLS on `characters` to allow anonymous SELECT where is_public=true
+       - Add a "Share" button to CharacterSheetPage that copies the public URL
+       - Add `is_public` boolean column to characters table (default false)
+       - Add toggle on CharacterSheetPage to make a character public/private
 
-    SHOULD FIX — Add missing barrel exports to level-up-steps/index.ts:
-      export { HpGrowthStep } from './HpGrowthStep';
-      export type { HpGrowthResult } from './HpGrowthStep';
-      Then update the import in LevelUpWizard.tsx to use the barrel instead of the direct path.
+    2. INITIATIVE TRACKER with HP management
+       - Live initiative tracker for use during campaign sessions
+       - Combatants: name, initiative roll, current HP, max HP, status/conditions
+       - GM can add/remove combatants, edit HP (damage/heal), reorder by initiative
+       - Players can see the tracker (read-only) in real-time via Supabase Realtime
+       - Store in a new `initiative_entries` table in migration 012_phase4.sql
+       - Add as a new tab on CampaignDetailPage (alongside Quest Board, Session, Party)
+       - RLS: GM/co-GM can write; all campaign members can read
 
-    LOW PRIORITY — In SessionTabErrorBoundary.tsx, gate the console.error call behind
-      import.meta.env.DEV so it does not fire in production.
+    3. NOTIFICATION SYSTEM — your turn, quest updated, session starting
+       - New `notifications` table: user_id, type, title, message, read, campaign_id, created_at
+       - RLS: users see only their own notifications
+       - Notification bell icon in the Header with unread count badge
+       - Dropdown panel showing recent notifications, click to mark as read
+       - Auto-create notifications via Supabase DB triggers or client-side on relevant actions:
+           * "Session started" — when a session begins in a campaign you're in
+           * "Quest updated" — when a quest status changes in your campaign
+           * "Your turn" — when initiative order advances to your character
+       - Real-time subscription to own notifications in a new notificationStore.ts
+       - Add to migration 012_phase4.sql
 
-    Do NOT touch CreationWizard.tsx or DaggerheartAncestryStep.tsx — those are flagged
-    as future refactor candidates only, not to be changed now.
+    4. MOBILE-RESPONSIVE PASS across all pages
+       - Audit every page and major component for mobile breakpoints
+       - Fix: Header nav (hamburger menu on mobile), CharacterListPage card grid,
+         CampaignDetailPage tabs (scrollable on small screens),
+         QuestBoard Kanban (horizontal scroll on mobile),
+         CharacterSheet sections (single column on mobile),
+         all modals/dialogs (full-width on mobile)
+       - Use Tailwind responsive prefixes (sm:, md:, lg:) — no new dependencies needed
+       - Test at 375px (iPhone SE), 390px (iPhone 14), 768px (iPad) widths
 
-    After all changes, read src/lib/dice.ts first to understand the rollDice API
-    before making any replacements. Then run:
-      pnpm build   (from frontend/ — must pass with zero TypeScript errors)
-      pnpm lint    (from frontend/ — must pass clean)
+    5. PDF CHARACTER SHEET EXPORT (client-side, per system)
+       - Export any character sheet as a PDF from the CharacterSheetPage
+       - Use @react-pdf/renderer (install via pnpm) — renders React components to PDF
+       - Create a PdfCharacterSheet component that renders the character's data cleanly
+       - "Export PDF" button on CharacterSheetPage
+       - PDF should include: character name, system, all sheet section data
+       - Keep it system-agnostic — iterate over the sheet layout sections
+
+    6. CAMPAIGN JOURNALS — rich text, image embeds (GM + player notes)
+       - New `journal_entries` table: id, campaign_id, author_id, title, content (rich text JSON),
+         is_gm_only, created_at, updated_at
+       - RLS: all members can read non-gm_only entries; only GM/co-GM can read gm_only entries;
+         authors can create/edit their own entries; GM can edit any entry
+       - Use Tiptap (install @tiptap/react @tiptap/starter-kit @tiptap/extension-image via pnpm)
+         for rich text editing with image embed support
+       - New "Journal" tab on CampaignDetailPage
+       - Journal list + entry editor with Tiptap
+       - GM entries are marked with a lock icon; gm_only toggle for GMs
+       - Add to migration 012_phase4.sql
+
+    ---
+
+    IMPLEMENTATION ORDER (follow this):
+    1. Write migration 012_phase4.sql (all DB changes in one file)
+    2. Mobile responsive pass (no new deps, quick wins)
+    3. Public character URLs (small scoped change)
+    4. Initiative tracker (builds on existing campaign patterns)
+    5. Notification system (new store + header component)
+    6. Campaign journals (Tiptap — install first)
+    7. PDF export (@react-pdf/renderer — install last as it's heavyweight)
+
+    CONVENTIONS (must follow):
+    - TypeScript strict mode — no unused vars/params
+    - Use @/ path alias for src/
+    - Lucide React for all icons
+    - shadcn/ui components for all UI (Card, Button, Dialog, Badge, Tabs, Input, Label)
+    - Tailwind v4 for all styling
+    - pnpm for installing new packages (run from frontend/)
+    - All new Zustand stores follow existing patterns in src/stores/
+    - All new Supabase tables need RLS policies in the migration
+    - Run pnpm build from frontend/ and verify zero TypeScript errors when done
+    - Run pnpm lint from frontend/ and verify zero lint errors when done
     """
 
     # Toggle steps — turn off what you don't need for faster runs
     STEPS = {
-        "manager":        False,  # Task is already fully specified
-        "researcher":     False,
-        "architect":      False,
-        "developer":      True,   # Makes all the fixes
-        "second_opinion": True,   # Verifies the fixes are correct
-        "tester":         True,   # Runs build + lint to confirm nothing broke
-        "debugger":       True,   # Catches any build/lint failures
-        "reviewer":       False,
+        "manager":        True,   # Plans implementation order and subtasks
+        "researcher":     True,   # Confirms best library choices for PDF + rich text
+        "architect":      True,   # Designs DB schema, component structure, store patterns
+        "developer":      True,   # Implements all 6 features
+        "second_opinion": True,   # Verifies correctness of implementation
+        "tester":         True,   # Runs build + lint, writes E2E tests
+        "debugger":       True,   # Fixes any build/lint/test failures
+        "reviewer":       True,   # Security audit of new RLS policies + new code
         "refactorer":     False,
-        "documenter":     False,
+        "documenter":     True,   # Updates CLAUDE.md with new patterns
         "devops":         False,
     }
 

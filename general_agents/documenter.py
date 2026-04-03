@@ -20,6 +20,7 @@ async def run(task: str):
     async for message in query(
         prompt=task,
         options=ClaudeAgentOptions(
+            model="claude-haiku-4-5-20251001",
             allowed_tools=["Read", "Write", "Edit", "Glob", "Grep"],
             permission_mode="acceptEdits",
             system_prompt=SYSTEM_PROMPT,
